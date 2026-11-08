@@ -1,15 +1,27 @@
 import { useState } from 'react';
 import {
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 
-const initialTasks = [
+type Task = {
+  id: string;
+  title: string;
+  due: string;
+  completed: boolean;
+};
+
+const initialTasks: Task[] = [
   {
     id: '1',
     title: 'Finish programming assignment',
@@ -46,11 +58,16 @@ const classes = [
 ];
 
 export default function HomeScreen() {
-  const [tasks, setTasks] = useState(initialTasks);
+  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newDue, setNewDue] = useState('');
 
   const completedCount = tasks.filter(
     task => task.completed
   ).length;
+
+  const pendingCount = tasks.length - completedCount;
 
   function toggleTask(id: string) {
     setTasks(current =>
@@ -62,13 +79,45 @@ export default function HomeScreen() {
     );
   }
 
+  function openAddTask() {
+    setNewTitle('');
+    setNewDue('');
+    setModalVisible(true);
+  }
+
+  function addTask() {
+    const title = newTitle.trim();
+    const due = newDue.trim();
+
+    if (!title) {
+      Alert.alert(
+        'Task Title Required',
+        'Please enter a title for your task.'
+      );
+      return;
+    }
+
+    const task: Task = {
+      id: `${Date.now()}-${Math.random()}`,
+      title,
+      due: due || 'No deadline set',
+      completed: false,
+    };
+
+    setTasks(current => [...current, task]);
+    setModalVisible(false);
+    setNewTitle('');
+    setNewDue('');
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" />
 
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
           <View style={styles.headerText}>
@@ -100,7 +149,7 @@ export default function HomeScreen() {
 
           <View style={[styles.statCard, styles.orange]}>
             <Text style={styles.statNumber}>
-              {tasks.length - completedCount}
+              {pendingCount}
             </Text>
             <Text style={styles.statLabel}>Pending</Text>
           </View>
@@ -124,7 +173,9 @@ export default function HomeScreen() {
               <Text style={styles.cardTitle}>
                 {item.subject}
               </Text>
-              <Text style={styles.muted}>{item.room}</Text>
+              <Text style={styles.muted}>
+                {item.room}
+              </Text>
               <Text style={styles.classTime}>
                 {item.time}
               </Text>
@@ -134,16 +185,30 @@ export default function HomeScreen() {
 
         <View style={styles.taskHeading}>
           <Text style={styles.sectionTitle}>My Tasks</Text>
+
           <Text style={styles.counter}>
             {completedCount}/{tasks.length} done
           </Text>
         </View>
+
+        <Pressable
+          style={styles.addTaskButton}
+          onPress={openAddTask}
+        >
+          <Text style={styles.addTaskButtonText}>
+            + Add Task
+          </Text>
+        </Pressable>
 
         {tasks.map(task => (
           <Pressable
             key={task.id}
             onPress={() => toggleTask(task.id)}
             style={styles.card}
+            accessibilityRole="checkbox"
+            accessibilityState={{
+              checked: task.completed,
+            }}
           >
             <View
               style={[
@@ -165,7 +230,9 @@ export default function HomeScreen() {
               >
                 {task.title}
               </Text>
-              <Text style={styles.muted}>{task.due}</Text>
+              <Text style={styles.muted}>
+                {task.due}
+              </Text>
             </View>
           </Pressable>
         ))}
@@ -181,6 +248,76 @@ export default function HomeScreen() {
         <Text style={styles.navItem}>✓  Tasks</Text>
         <Text style={styles.navItem}>○  Profile</Text>
       </View>
+
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>
+              Create New Task
+            </Text>
+
+            <Text style={styles.inputLabel}>
+              Task Title *
+            </Text>
+
+            <TextInput
+              style={styles.textInput}
+              placeholder="e.g. Finish programming assignment"
+              placeholderTextColor="#94A3B8"
+              value={newTitle}
+              onChangeText={setNewTitle}
+              autoFocus
+              maxLength={100}
+              returnKeyType="next"
+            />
+
+            <Text style={styles.inputLabel}>
+              Deadline
+            </Text>
+
+            <TextInput
+              style={styles.textInput}
+              placeholder="e.g. Due tomorrow or Friday"
+              placeholderTextColor="#94A3B8"
+              value={newDue}
+              onChangeText={setNewDue}
+              maxLength={60}
+              returnKeyType="done"
+              onSubmitEditing={addTask}
+            />
+
+            <Text style={styles.helperText}>
+              Leave the deadline blank if it is not set.
+            </Text>
+
+            <Pressable
+              style={styles.submitButton}
+              onPress={addTask}
+            >
+              <Text style={styles.submitButtonText}>
+                Add Task
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.cancelButton}
+              onPress={() => setModalVisible(false)}
+            >
+              <Text style={styles.cancelButtonText}>
+                Cancel
+              </Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -310,6 +447,20 @@ const styles = StyleSheet.create({
     marginTop: 18,
     marginBottom: 14,
   },
+  addTaskButton: {
+    backgroundColor: '#4F46E5',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  addTaskButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
   checkbox: {
     width: 23,
     height: 23,
@@ -355,5 +506,66 @@ const styles = StyleSheet.create({
   navItem: {
     color: '#64748B',
     fontSize: 11,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 22,
+  },
+  modalTitle: {
+    color: '#0F172A',
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 22,
+  },
+  inputLabel: {
+    color: '#334155',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  textInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: '#0F172A',
+    fontSize: 14,
+    marginBottom: 18,
+  },
+  helperText: {
+    color: '#64748B',
+    fontSize: 12,
+    marginTop: -8,
+    marginBottom: 18,
+  },
+  submitButton: {
+    backgroundColor: '#4F46E5',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  submitButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 15,
+  },
+  cancelButton: {
+    paddingVertical: 13,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  cancelButtonText: {
+    color: '#64748B',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
